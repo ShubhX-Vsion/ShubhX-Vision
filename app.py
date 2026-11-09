@@ -368,10 +368,6 @@ with top_right:
 with st.sidebar:
     st.markdown('<div class="brand">✦ ShubhX Vision</div>', unsafe_allow_html=True)
     st.caption("Your premium analytics workspace")
-    if GEMINI_API_KEY:
-        st.caption("🟢 Gemini API key detected")
-    else:
-        st.caption("🟡 Local AI mode · Gemini key not detected")
     st.divider()
     page = st.radio(
         "WORKSPACE",
