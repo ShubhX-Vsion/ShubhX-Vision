@@ -1,10 +1,5 @@
 """
 ShubhX Vision — Premium Data Intelligence Studio
-Run with: streamlit run app.py
-"""
-"""
-ShubhX Vision — Premium Data Intelligence Studio
-Run with: streamlit run "app (3).py"
 """
 
 import ast
