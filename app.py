@@ -452,7 +452,6 @@ if df is None:
         st.session_state.loaded_signature = None
         log("Loaded sample dataset")
         st.rerun()
-    st.info("Tip: The sample dataset includes a few intentional data-quality issues so you can test the cleaning tools.")
     st.stop()
 
 # ----------------------------- DATA SUMMARY -----------------------------
