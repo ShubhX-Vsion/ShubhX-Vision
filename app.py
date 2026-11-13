@@ -1,6 +1,7 @@
 """
-ShubhX Vision — Premium Data Intelligence Studio
+ShubhX Vision — Premium Data Intelligence Studio (Corrected Build)
 """
+
 
 import ast
 import io
@@ -33,7 +34,6 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 
 st.set_page_config(
     page_title="ShubhX Vision | Data Intelligence",
-    page_icon="✦",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -47,6 +47,10 @@ DEFAULTS = {
     "loaded_signature": None,
     "history": [],
     "chat": [],
+    "undo_stack": [],
+    "redo_stack": [],
+    "last_snapshot": None,
+    "dashboard_saved_charts": [],
 }
 for key, value in DEFAULTS.items():
     if key not in st.session_state:
@@ -99,6 +103,27 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] {{
  border-right:1px solid var(--app-line);
 }}
 [data-testid="stSidebar"] > div:first-child {{background:transparent;}}
+/* Workspace navigation: separated 3D-style cards. */
+[data-testid="stRadio"] [role="radiogroup"] {{gap:9px !important;}}
+[data-testid="stRadio"] [role="radiogroup"] > label,
+[data-testid="stRadio"] label[data-baseweb="radio"] {{
+ display:flex !important;align-items:center !important;gap:10px !important;
+ padding:11px 13px !important;margin:0 0 3px 0 !important;
+ border:1px solid var(--app-line) !important;border-radius:14px !important;
+ background:var(--app-surface-2) !important;box-shadow:0 4px 0 rgba(25,35,65,.08),0 8px 18px rgba(25,35,65,.07) !important;
+ transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease !important;
+}}
+[data-testid="stRadio"] [role="radiogroup"] > label:hover,
+[data-testid="stRadio"] label[data-baseweb="radio"]:hover {{
+ transform:translateY(-2px) !important;border-color:var(--accent) !important;
+ box-shadow:0 6px 0 rgba(25,35,65,.08),0 12px 22px rgba(25,35,65,.10) !important;
+}}
+[data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked),
+[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) {{
+ border-color:var(--accent) !important;background:linear-gradient(135deg,rgba(115,87,246,.14),rgba(39,183,197,.09)) !important;
+ box-shadow:inset 0 0 0 1px rgba(115,87,246,.12),0 4px 0 rgba(115,87,246,.16),0 10px 20px rgba(75,65,150,.10) !important;
+}}
+[data-testid="stRadio"] [role="radiogroup"] > label p {{font-weight:700 !important;line-height:1.25 !important;margin:0 !important;}}
 /* Keep light-theme text readable without forcing chart/canvas internals. */
 .stMarkdown, .stText, p, label, [data-testid="stCaptionContainer"],
 [data-testid="stWidgetLabel"], [data-testid="stMarkdownContainer"] {{
@@ -134,6 +159,10 @@ small, .muted {{color:var(--app-muted) !important;}}
 .metric-value {{font:800 clamp(24px,2.2vw,31px) Manrope,sans-serif;color:var(--app-fg) !important;margin-top:9px;overflow-wrap:anywhere;}}
 .metric-note {{font-size:11px;color:var(--app-muted) !important;margin-top:4px;overflow-wrap:anywhere;}}
 .section-kicker {{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:800;color:var(--app-muted) !important;}}
+.dataset-help-card {{display:flex;flex-direction:column;gap:7px;padding:14px 14px;margin:9px 0 12px;border:1px solid var(--app-line);border-radius:14px;background:var(--app-surface-2) !important;box-shadow:0 4px 0 rgba(25,35,65,.07),0 8px 18px rgba(25,35,65,.06);}}
+.dataset-help-card, .dataset-help-card * {{color:var(--app-fg) !important;-webkit-text-fill-color:var(--app-fg) !important;opacity:1 !important;visibility:visible !important;}}
+.dataset-help-card strong {{display:block;font-size:14px;font-weight:800;line-height:1.45;}}
+.dataset-help-card span {{display:block;font-size:12px;font-weight:600;line-height:1.55;white-space:normal;overflow-wrap:anywhere;}}
 div[data-testid="stVerticalBlockBorderWrapper"] {{
  border-color:var(--app-line) !important;border-radius:18px;
 }}
@@ -204,9 +233,37 @@ div.stButton > button:disabled {{opacity:.48;transform:none;}}
  -webkit-text-fill-color:var(--app-fg) !important;
 }}
 [data-testid="stSidebar"] [data-testid="stCaptionContainer"],
-[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {{
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"],
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"] {{
  color:var(--app-fg) !important;
+ -webkit-text-fill-color:var(--app-fg) !important;
 }}
+/* Explicit contrast for info cards, captions and dataset helper text in light mode. */
+[data-testid="stAlert"], [data-testid="stAlert"] *,
+[data-testid="stAlert"] p, [data-testid="stAlert"] span {{
+ color:var(--app-fg) !important;
+ -webkit-text-fill-color:var(--app-fg) !important;
+ opacity:1 !important;
+}}
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] *,
+[data-testid="stMarkdownContainer"] p {{
+ color:var(--app-fg) !important;
+ -webkit-text-fill-color:var(--app-fg) !important;
+}}
+/* Separate content cards and prevent KPI text collisions. */
+[data-testid="stVerticalBlockBorderWrapper"] {{
+ background:var(--app-surface) !important;box-shadow:var(--app-shadow) !important;
+ padding:clamp(14px,1.5vw,22px) !important;margin-bottom:16px !important;
+ border:1px solid var(--app-line) !important;border-radius:18px !important;
+}}
+.metric-card {{min-height:154px;height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-start;gap:7px;overflow:visible;padding:20px;}}
+.metric-label {{line-height:1.45;overflow-wrap:anywhere;white-space:normal;}}
+.metric-value {{line-height:1.2;overflow-wrap:anywhere;word-break:break-word;white-space:normal;}}
+.metric-note {{line-height:1.5;overflow-wrap:anywhere;white-space:normal;}}
+[data-testid="stHorizontalBlock"] {{align-items:stretch !important;}}
+[data-testid="stVerticalBlock"] {{gap:0.85rem;}}
+[data-testid="stHorizontalBlock"] {{gap:clamp(12px,1.4vw,22px) !important;}}
 [data-testid="stChatMessage"] {{
  border:1px solid var(--app-line);border-radius:16px;background:var(--app-surface);
 }}
@@ -228,6 +285,91 @@ footer,#MainMenu {{visibility:hidden;}}
  font-size:11px;letter-spacing:.65px;line-height:1.8;
 }}
 .footer strong {{color:var(--app-fg) !important;font-weight:800;}}
+@media (max-width: 900px) {{
+ .metric-card {{min-height:132px;padding:14px;}}
+ .metric-value {{font-size:24px;}}
+ [data-testid="stRadio"] [role="radiogroup"] > label {{padding:10px !important;}}
+}}
+
+/* ===== FINAL CONTRAST FIX: UPLOAD WIDGET ===== */
+[data-testid="stFileUploader"] {{
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+}}
+[data-testid="stFileUploaderDropzone"],
+section[data-testid="stFileUploaderDropzone"] {{
+  background: {'#17223A' if dark else '#F3F5FF'} !important;
+  border: 1.5px dashed {'#8E80FF' if dark else '#7357F6'} !important;
+  border-radius: 14px !important;
+  min-height: 112px !important;
+}}
+[data-testid="stFileUploaderDropzone"] *,
+section[data-testid="stFileUploaderDropzone"] * {{
+  color: {'#F5F7FF' if dark else '#18233B'} !important;
+  -webkit-text-fill-color: {'#F5F7FF' if dark else '#18233B'} !important;
+  opacity: 1 !important;
+}}
+[data-testid="stFileUploaderDropzone"] button,
+section[data-testid="stFileUploaderDropzone"] button {{
+  background: {'#354568' if dark else '#E4E9FF'} !important;
+  color: {'#FFFFFF' if dark else '#38268F'} !important;
+  -webkit-text-fill-color: {'#FFFFFF' if dark else '#38268F'} !important;
+  border: 1px solid {'#66769B' if dark else '#B9AEFF'} !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}}
+[data-testid="stFileUploaderDropzone"] button *,
+section[data-testid="stFileUploaderDropzone"] button * {{
+  color: {'#FFFFFF' if dark else '#38268F'} !important;
+  -webkit-text-fill-color: {'#FFFFFF' if dark else '#38268F'} !important;
+}}
+[data-testid="stFileUploaderDropzone"] small,
+[data-testid="stFileUploaderDropzone"] span,
+[data-testid="stFileUploaderDropzone"] p {{
+  color: {'#E4E9F5' if dark else '#263653'} !important;
+  -webkit-text-fill-color: {'#E4E9F5' if dark else '#263653'} !important;
+  font-weight: 600 !important;
+}}
+
+/* ===== FINAL CONTRAST FIX: DATASET / DEMO INFORMATION CARDS ===== */
+.dataset-help-card {{
+  background: {'#17223A' if dark else '#F1F4FF'} !important;
+  background-color: {'#17223A' if dark else '#F1F4FF'} !important;
+  border: 1px solid {'#435274' if dark else '#C9D3F0'} !important;
+  border-radius: 14px !important;
+  padding: 15px 14px !important;
+  margin: 10px 0 13px !important;
+  box-shadow: 0 5px 14px rgba(30, 45, 85, .08) !important;
+}}
+.dataset-help-card,
+.dataset-help-card *,
+.dataset-help-card strong,
+.dataset-help-card span {{
+  color: {'#F5F7FF' if dark else '#18233B'} !important;
+  -webkit-text-fill-color: {'#F5F7FF' if dark else '#18233B'} !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  text-shadow: none !important;
+}}
+.dataset-help-card strong {{
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  line-height: 1.5 !important;
+}}
+.dataset-help-card span {{
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.65 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}}
+::selection {{
+  background: #7357F6 !important;
+  color: #FFFFFF !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}}
+
 </style>
 """,
     unsafe_allow_html=True,
@@ -368,14 +510,37 @@ with top_right:
 with st.sidebar:
     st.markdown('<div class="brand">✦ ShubhX Vision</div>', unsafe_allow_html=True)
     st.caption("Your premium analytics workspace")
+    
     st.divider()
     page = st.radio(
         "WORKSPACE",
-        ["Overview", "Data Cleaning", "Data Analysis", "AI Assistant", "Data Lab", "Export Center"],
+        [
+            "Overview",
+            "Data Cleaning Studio",
+            "Data Analysis",
+            "AI Data Assistant",
+            "Data Lab",
+            "Dashboard Builder",
+            "Reports",
+            "Export Center",
+            "Activity History",
+            "Help & About",
+        ],
         label_visibility="visible",
     )
-    st.markdown("#### Add your dataset")
-    uploaded = st.file_uploader("Upload CSV / Excel", type=["csv", "xlsx", "xls"], help="Supported formats: CSV, XLSX and XLS.")
+    st.markdown("#### Dataset")
+    st.markdown(
+        '<div class="dataset-help-card">'
+        '<strong>Maximum upload size: 200 MB per file</strong>'
+        '<span>Supported file formats: CSV · XLSX · XLS</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    uploaded = st.file_uploader(
+        "Upload a dataset",
+        type=["csv", "xlsx", "xls"],
+    
+    )
     if uploaded is not None:
         signature = (uploaded.name, uploaded.size)
         if signature != st.session_state.loaded_signature:
@@ -390,6 +555,9 @@ with st.sidebar:
                     st.session_state.file_name = uploaded.name
                     st.session_state.loaded_signature = signature
                     st.session_state.chat = []
+                    st.session_state.undo_stack = []
+                    st.session_state.redo_stack = []
+                    st.session_state.last_snapshot = loaded.copy()
                     log(f"Loaded {uploaded.name}")
                     st.rerun()
             except Exception as exc:
@@ -397,7 +565,10 @@ with st.sidebar:
     if st.session_state.data is not None:
         st.caption(f"Current file: **{st.session_state.file_name or 'Dataset'}**")
         if st.button("↺ Reset to original data", use_container_width=True):
-            st.session_state.data = st.session_state.original.copy()
+            st.session_state.data = st.session_state.original.copy(deep=True)
+            st.session_state.undo_stack = []
+            st.session_state.redo_stack = []
+            st.session_state.last_snapshot = st.session_state.data.copy(deep=True)
             log("Restored original dataset")
             st.rerun()
         if st.button("✕ Clear dataset", use_container_width=True):
@@ -406,6 +577,9 @@ with st.sidebar:
             st.session_state.file_name = None
             st.session_state.loaded_signature = None
             st.session_state.chat = []
+            st.session_state.undo_stack = []
+            st.session_state.redo_stack = []
+            st.session_state.last_snapshot = None
             log("Cleared dataset")
             st.rerun()
     st.divider()
@@ -436,28 +610,91 @@ if df is None:
     if st.button("✨ Explore sample dataset", type="primary", use_container_width=True):
         rng = np.random.default_rng(12)
         demo = pd.DataFrame({
-            "Customer": [f"C{i:03}" for i in range(1, 151)],
+            "Customer_ID": [f"C{i:03}" for i in range(1, 151)],
             "Age": rng.integers(18, 70, 150),
             "Monthly_Charge": rng.normal(850, 180, 150).round(2),
             "Tenure": rng.integers(1, 73, 150),
-            "Plan": rng.choice(["Basic", "Standard", "Premium"], 150),
+            "Plan": rng.choice(["Basic", "Standard", "Premium", " basic ", "PREMIUM", " Standard "], 150),
             "Region": rng.choice(["North", "South", "East", "West"], 150),
             "Churn": rng.choice(["Yes", "No"], 150, p=[0.27, 0.73]),
         })
+        # Intentional quality issues for testing the cleaning tools.
         demo.loc[[3, 17, 45], "Age"] = np.nan
+        demo.loc[[8, 39], "Region"] = np.nan
         demo.loc[12, "Monthly_Charge"] = 2400
+        demo.loc[20, "Customer_ID"] = demo.loc[19, "Customer_ID"]  # repeated key
+        demo = pd.concat([demo, demo.iloc[[7]]], ignore_index=True)  # exact duplicate row
         st.session_state.data = demo
         st.session_state.original = demo.copy()
         st.session_state.file_name = "sample_dataset.csv"
         st.session_state.loaded_signature = None
+        st.session_state.undo_stack = []
+        st.session_state.redo_stack = []
+        st.session_state.last_snapshot = demo.copy()
         log("Loaded sample dataset")
         st.rerun()
+    with st.container(border=True):
+        st.markdown("#### Demo dataset quality checks")
+        st.markdown(
+            '<div class="dataset-help-card">'
+            '<strong>What is included in the demo dataset?</strong>'
+            '<span>The demo dataset intentionally contains missing Age and Region values, '
+            'one high Monthly_Charge outlier, whitespace/case inconsistencies, '
+            'a repeated Customer_ID key and one exact duplicate row. '
+            'Load it to test the cleaning tools.</span>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
     st.stop()
 
 # ----------------------------- DATA SUMMARY -----------------------------
 if not isinstance(df, pd.DataFrame):
-    st.error("The current dataset is not valid. Please upload it again.")
     st.stop()
+
+# ----------------------------- UNDO / REDO -----------------------------
+# This section is reached only after a real DataFrame has been loaded.
+# The explicit guard prevents NoneType.copy() errors on an empty workspace.
+if isinstance(df, pd.DataFrame):
+    if st.session_state.last_snapshot is None:
+        st.session_state.last_snapshot = df.copy(deep=True)
+    elif not df.equals(st.session_state.last_snapshot):
+        st.session_state.undo_stack.append(st.session_state.last_snapshot.copy(deep=True))
+        st.session_state.undo_stack = st.session_state.undo_stack[-30:]
+        st.session_state.redo_stack = []
+        st.session_state.last_snapshot = df.copy(deep=True)
+
+    undo_col, redo_col, history_col = st.columns([1, 1, 4])
+    with undo_col:
+        if st.button("↶ Undo", disabled=not st.session_state.undo_stack, key="global_undo"):
+            current = st.session_state.data.copy(deep=True)
+            previous = st.session_state.undo_stack.pop()
+            st.session_state.redo_stack.append(current)
+            st.session_state.data = previous.copy(deep=True)
+            st.session_state.last_snapshot = previous.copy(deep=True)
+            log("Undo applied")
+            st.rerun()
+    with redo_col:
+        if st.button("↷ Redo", disabled=not st.session_state.redo_stack, key="global_redo"):
+            current = st.session_state.data.copy(deep=True)
+            next_frame = st.session_state.redo_stack.pop()
+            st.session_state.undo_stack.append(current)
+            st.session_state.undo_stack = st.session_state.undo_stack[-30:]
+            st.session_state.data = next_frame.copy(deep=True)
+            st.session_state.last_snapshot = next_frame.copy(deep=True)
+            log("Redo applied")
+            st.rerun()
+    with history_col:
+        st.caption(
+            f"Undo steps: {len(st.session_state.undo_stack)}  ·  "
+            f"Redo steps: {len(st.session_state.redo_stack)}  ·  "
+            "Undo/Redo tracks dataset changes (up to 30 steps)."
+        )
+else:
+    # Defensive fallback: never call .copy() on None or another object.
+    st.session_state.last_snapshot = None
+    st.session_state.undo_stack = []
+    st.session_state.redo_stack = []
+
 rows, cols = df.shape
 num, cat, missing, dups = dataset_profile(df)
 missing_pct = (missing / max(rows * cols, 1)) * 100
@@ -466,53 +703,70 @@ missing_pct = (missing / max(rows * cols, 1)) * 100
 if page == "Overview":
     st.markdown("### Workspace overview")
     st.caption(f"Currently exploring: **{st.session_state.file_name or 'Dataset'}**")
-    k1, k2, k3, k4 = st.columns(4, gap="medium")
-    with k1:
-        metric("TOTAL ROWS", f"{rows:,}", "Records in current dataset", "Total number of records.")
-    with k2:
-        metric("TOTAL COLUMNS", f"{cols:,}", f"{len(num)} numeric · {len(cat)} categorical", "Number of fields in your dataset.")
-    with k3:
-        metric("MISSING CELLS", f"{missing:,}", f"{missing_pct:.1f}% of all cells", "Cells that contain no value.")
-    with k4:
-        metric("DUPLICATE ROWS", f"{dups:,}", "Exact repeated records", "Rows that are identical across all columns.")
-    st.write("")
-    left, right = st.columns([1.35, 1], gap="large")
+
+    with st.container(border=True):
+        st.markdown("#### Dataset at a glance")
+        k1, k2, k3, k4 = st.columns(4, gap="large")
+        with k1:
+            metric("TOTAL ROWS", f"{rows:,}", "Records in current dataset", "Total number of records.")
+        with k2:
+            metric("TOTAL COLUMNS", f"{cols:,}", f"{len(num)} numeric · {len(cat)} categorical", "Number of fields in your dataset.")
+        with k3:
+            metric("MISSING CELLS", f"{missing:,}", f"{missing_pct:.1f}% of all cells", "Cells that contain no value.")
+        with k4:
+            metric("DUPLICATE ROWS", f"{dups:,}", "Exact repeated records", "Rows that are identical across all columns.")
+
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+    left, right = st.columns([1.25, 1], gap="large")
     with left:
-        st.markdown("#### Dataset preview")
-        st.dataframe(df.head(12), use_container_width=True, height=365, hide_index=True)
+        with st.container(border=True):
+            st.markdown("#### Dataset preview")
+            st.caption("First 12 records from the active dataset")
+            st.dataframe(df.head(12), use_container_width=True, height=365, hide_index=True)
     with right:
-        st.markdown("#### Data composition")
-        composition = pd.DataFrame({"Field type": ["Numeric", "Categorical / other"], "Columns": [len(num), len(cat)]})
-        fig = px.pie(composition, names="Field type", values="Columns", hole=0.68,
-                     color_discrete_sequence=[COLORS["accent"], COLORS["accent2"]])
-        fig.update_traces(textposition="outside", textinfo="label+value")
-        show_plot(fig, 365)
+        with st.container(border=True):
+            st.markdown("#### Data composition")
+            st.caption("Numeric and categorical field distribution")
+            composition = pd.DataFrame({"Field type": ["Numeric", "Categorical / other"], "Columns": [len(num), len(cat)]})
+            fig = px.pie(composition, names="Field type", values="Columns", hole=0.68,
+                         color_discrete_sequence=[COLORS["accent"], COLORS["accent2"]])
+            fig.update_traces(textposition="outside", textinfo="label+value")
+            show_plot(fig, 365)
+
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
     left, right = st.columns(2, gap="large")
     with left:
-        st.markdown("#### Missing values by column")
-        missing_frame = df.isna().sum().sort_values(ascending=False).head(15).rename("Missing").reset_index()
-        missing_frame.columns = ["Column", "Missing"]
-        if missing_frame["Missing"].sum() == 0:
-            st.success("Great! No missing values found.")
-        else:
-            fig = px.bar(missing_frame, x="Column", y="Missing", color="Missing",
-                         color_continuous_scale="Purples", text="Missing")
-            fig.update_layout(coloraxis_showscale=False)
-            show_plot(fig, 340)
+        with st.container(border=True):
+            st.markdown("#### Missing values by column")
+            st.caption("Columns with the highest number of empty cells")
+            missing_frame = df.isna().sum().sort_values(ascending=False).head(15).rename("Missing").reset_index()
+            missing_frame.columns = ["Column", "Missing"]
+            if missing_frame["Missing"].sum() == 0:
+                st.success("Great! No missing values found.")
+            else:
+                fig = px.bar(missing_frame, x="Column", y="Missing", color="Missing",
+                             color_continuous_scale="Purples", text="Missing")
+                fig.update_layout(coloraxis_showscale=False)
+                show_plot(fig, 340)
     with right:
-        st.markdown("#### Column profile")
-        profile = pd.DataFrame({
-            "Column": df.columns.astype(str),
-            "Data type": df.dtypes.astype(str).values,
-            "Missing": df.isna().sum().values,
-            "Unique": df.nunique(dropna=True).values,
-        })
-        st.dataframe(profile, use_container_width=True, height=340, hide_index=True)
-    with st.expander("View complete dataset", expanded=False):
-        st.dataframe(df, use_container_width=True, height=420, hide_index=True)
+        with st.container(border=True):
+            st.markdown("#### Column profile")
+            st.caption("Data type, missing cells and unique values for each field")
+            profile = pd.DataFrame({
+                "Column": df.columns.astype(str),
+                "Data type": df.dtypes.astype(str).values,
+                "Missing": df.isna().sum().values,
+                "Unique": df.nunique(dropna=True).values,
+            })
+            st.dataframe(profile, use_container_width=True, height=340, hide_index=True)
+
+    st.write("")
+    with st.container(border=True):
+        with st.expander("View complete dataset", expanded=False):
+            st.dataframe(df, use_container_width=True, height=420, hide_index=True)
 
 # ----------------------------- DATA CLEANING -----------------------------
-elif page == "Data Cleaning":
+elif page in ("Data Cleaning", "Data Cleaning Studio"):
     st.markdown("### Data Cleaning Studio")
     st.caption("Apply changes carefully. Use the sidebar reset button to restore the original upload.")
     missing_tab, duplicate_tab, outlier_tab, text_tab = st.tabs(
@@ -687,7 +941,7 @@ elif page == "Data Analysis":
         st.warning(f"Could not calculate this summary: {exc}")
 
 # ----------------------------- AI ASSISTANT -----------------------------
-elif page == "AI Assistant":
+elif page in ("AI Assistant", "AI Data Assistant"):
     st.markdown("### AI Data Assistant")
     api_key = GEMINI_API_KEY
     if api_key:
@@ -879,9 +1133,202 @@ elif page == "Export Center":
     })
     st.dataframe(export_profile, use_container_width=True, height=360, hide_index=True)
 
-# ----------------------------- FOOTER -----------------------------
+# ----------------------------- DASHBOARD BUILDER -----------------------------
+elif page == "Dashboard Builder":
+    st.markdown("### Dashboard Builder")
+    st.caption("Build a visual dashboard from the current dataset.")
+
+    k1, k2, k3, k4 = st.columns(4, gap="medium")
+    with k1:
+        metric("TOTAL ROWS", f"{rows:,}", "Records in current dataset")
+    with k2:
+        metric("TOTAL COLUMNS", f"{cols:,}", "Available fields")
+    with k3:
+        metric("MISSING CELLS", f"{missing:,}", "Cells without values")
+    with k4:
+        metric("DUPLICATE ROWS", f"{dups:,}", "Exact repeated rows")
+
+    st.divider()
+    st.markdown("#### Dashboard chart builder")
+    chart_kind = st.selectbox(
+        "Visualization type",
+        ["Bar chart", "Line chart", "Scatter plot", "Histogram", "Box plot", "Pie chart", "Area chart"],
+        key="builder_chart_kind",
+    )
+    bx, by, bc = st.columns(3)
+    with bx:
+        dashboard_x = st.selectbox("X axis / Category", df.columns, key="builder_x")
+    with by:
+        dashboard_y_options = num if num else df.columns.tolist()
+        dashboard_y = st.selectbox("Y axis / Measure", dashboard_y_options, key="builder_y")
+    with bc:
+        dashboard_color_choice = st.selectbox("Color grouping", ["None"] + df.columns.tolist(), key="builder_color")
+    dashboard_color = None if dashboard_color_choice == "None" else dashboard_color_choice
+
+    try:
+        if chart_kind == "Bar chart":
+            if not pd.api.types.is_numeric_dtype(df[dashboard_y]):
+                st.warning("Select a numeric Y-axis column for a bar chart.")
+            else:
+                dashboard_fig = px.bar(df, x=dashboard_x, y=dashboard_y, color=dashboard_color,
+                                       title=f"{dashboard_y} by {dashboard_x}")
+                show_plot(dashboard_fig, 450)
+        elif chart_kind == "Line chart":
+            if not pd.api.types.is_numeric_dtype(df[dashboard_y]):
+                st.warning("Select a numeric Y-axis column for a line chart.")
+            else:
+                dashboard_fig = px.line(df.sort_values(dashboard_x), x=dashboard_x, y=dashboard_y,
+                                        color=dashboard_color, markers=True,
+                                        title=f"{dashboard_y} trend")
+                show_plot(dashboard_fig, 450)
+        elif chart_kind == "Scatter plot":
+            if not pd.api.types.is_numeric_dtype(df[dashboard_y]):
+                st.warning("Select a numeric Y-axis column for a scatter plot.")
+            else:
+                dashboard_fig = px.scatter(df, x=dashboard_x, y=dashboard_y, color=dashboard_color,
+                                           title=f"{dashboard_x} vs {dashboard_y}")
+                show_plot(dashboard_fig, 450)
+        elif chart_kind == "Histogram":
+            dashboard_fig = px.histogram(df, x=dashboard_x, color=dashboard_color,
+                                         title=f"Distribution of {dashboard_x}")
+            show_plot(dashboard_fig, 450)
+        elif chart_kind == "Box plot":
+            if not pd.api.types.is_numeric_dtype(df[dashboard_y]):
+                st.warning("Select a numeric Y-axis column for a box plot.")
+            else:
+                dashboard_fig = px.box(df, x=dashboard_x, y=dashboard_y, color=dashboard_color,
+                                       title=f"{dashboard_y} distribution")
+                show_plot(dashboard_fig, 450)
+        elif chart_kind == "Pie chart":
+            pie_frame = df[dashboard_x].fillna("Missing").astype(str).value_counts().head(20)
+            pie_frame = pie_frame.rename_axis(dashboard_x).reset_index(name="Count")
+            dashboard_fig = px.pie(pie_frame, names=dashboard_x, values="Count", hole=0.45,
+                                   title=f"Distribution of {dashboard_x}")
+            show_plot(dashboard_fig, 450)
+        else:
+            if not pd.api.types.is_numeric_dtype(df[dashboard_y]):
+                st.warning("Select a numeric Y-axis column for an area chart.")
+            else:
+                dashboard_fig = px.area(df.sort_values(dashboard_x), x=dashboard_x, y=dashboard_y,
+                                        color=dashboard_color, title=f"{dashboard_y} area chart")
+                show_plot(dashboard_fig, 450)
+    except Exception as exc:
+        st.warning(f"Unable to build this chart: {exc}")
+
+    st.markdown("#### Dashboard data preview")
+    st.dataframe(df.head(20), use_container_width=True, hide_index=True)
+
+
+# ----------------------------- REPORTS -----------------------------
+elif page == "Reports":
+    st.markdown("### Reports")
+    st.caption("Generate a text report containing dataset size, quality checks and summaries.")
+
+    report_text = f"""SHUBHX VISION — DATA INTELLIGENCE REPORT
+Generated: {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}
+
+DATASET INFORMATION
+File name: {st.session_state.file_name or 'Dataset'}
+Rows: {rows}
+Columns: {cols}
+Numeric columns: {len(num)}
+Categorical / other columns: {len(cat)}
+
+DATA QUALITY
+Missing cells: {missing}
+Missing percentage: {missing_pct:.2f}%
+Duplicate rows: {dups}
+
+COLUMN TYPES
+{df.dtypes.to_string()}
+
+MISSING VALUES BY COLUMN
+{df.isna().sum().to_string()}
+
+NUMERIC SUMMARY
+{df[num].describe().to_string() if num else 'No numeric columns available.'}
+
+CATEGORICAL SUMMARY
+{df[cat].describe(include='all').to_string() if cat else 'No categorical columns available.'}
+
+END OF REPORT
+Generated by ShubhX Vision.
+"""
+    r1, r2, r3 = st.columns(3)
+    with r1:
+        metric("TOTAL ROWS", f"{rows:,}")
+    with r2:
+        metric("MISSING CELLS", f"{missing:,}")
+    with r3:
+        metric("DUPLICATE ROWS", f"{dups:,}")
+    st.markdown("#### Report preview")
+    st.text_area("Generated report", report_text, height=420)
+    st.download_button(
+        "⬇ Download full report",
+        data=report_text.encode("utf-8"),
+        file_name="ShubhX_Vision_Report.txt",
+        mime="text/plain",
+        use_container_width=True,
+    )
+
+
+# ----------------------------- ACTIVITY HISTORY -----------------------------
+elif page == "Activity History":
+    st.markdown("### Activity History")
+    st.caption("Review recent actions performed in this workspace.")
+    if st.session_state.history:
+        for index, entry in enumerate(st.session_state.history, start=1):
+            with st.container(border=True):
+                st.write(f"**{index}.** {entry}")
+        if st.button("Clear activity history"):
+            st.session_state.history = []
+            st.success("Activity history cleared.")
+            st.rerun()
+    else:
+        st.info("No activity recorded yet. Your actions will appear here.")
+
+    st.divider()
+    st.markdown("#### Edit history")
+    h1, h2 = st.columns(2)
+    with h1:
+        st.metric("Available undo steps", len(st.session_state.undo_stack))
+    with h2:
+        st.metric("Available redo steps", len(st.session_state.redo_stack))
+    st.caption("Undo and Redo track dataset changes, with a maximum of 30 undo snapshots.")
+
+
+# ----------------------------- HELP & ABOUT -----------------------------
+elif page == "Help & About":
+    st.markdown("### Help & About")
+    st.markdown("#### Welcome to ShubhX Vision")
+    st.write(
+        "ShubhX Vision is a data intelligence workspace for uploading, cleaning, "
+        "analyzing, visualizing and reporting on datasets."
+    )
+    with st.expander("1. Overview", expanded=True):
+        st.write("Review dataset size, column types, missing values, duplicates and data composition.")
+    with st.expander("2. Data Cleaning Studio"):
+        st.write("Inspect and treat missing values, duplicates and outliers. Standardize text and convert data types.")
+    with st.expander("3. Data Analysis"):
+        st.write("Create interactive charts, inspect correlations and generate group-by summaries.")
+    with st.expander("4. AI Data Assistant"):
+        st.write("Ask questions about the uploaded dataset. Gemini requires a configured API key; local summary features work without it.")
+    with st.expander("5. Data Lab"):
+        st.write("Filter rows, create calculated columns, inspect statistics and take random samples.")
+    with st.expander("6. Dashboard Builder"):
+        st.write("Build a dashboard view with KPI cards and an interactive chart from the current dataset.")
+    with st.expander("7. Reports"):
+        st.write("Generate and download a text report containing dataset information and quality summaries.")
+    with st.expander("8. Export Center"):
+        st.write("Export the current dataset to CSV or Excel and download a JSON quality report.")
+    with st.expander("9. Undo and Redo"):
+        st.write("Undo restores the previous dataset state. Redo reapplies an undone change. Up to 30 dataset snapshots are retained during the current session.")
+    with st.expander("10. Privacy and data handling"):
+        st.write("Uploaded data is processed by this Streamlit app. If Gemini is configured and used, dataset context is sent to the Gemini service to answer the question.")
+    st.divider()
+
 st.markdown(
-    '<div class="footer"><strong>DEVELOPED BY-SHUBHAM SHARMA (DATA ANALYTICS AND PROMPT ENGINEER)</strong>'
+    '<div class="footer"><strong>DEVELOPED BY-SHUBHAM SHARMA✨ (DATA ANALYTICS AND PROMPT ENGINEER)</strong>'
     '<br>SHUBHX VISION · DATA INTELLIGENCE STUDIO · ALL RIGHTS RESERVED</div>',
     unsafe_allow_html=True,
 )
